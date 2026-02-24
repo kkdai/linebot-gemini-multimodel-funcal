@@ -242,21 +242,17 @@ ECOMMERCE_TOOLS = [
         ),
         types.FunctionDeclaration(
             name="get_order_history",
-            description="查詢用戶的訂單歷史記錄",
+            description="查詢當前用戶的訂單歷史記錄，LINE 用戶 ID 由系統自動帶入",
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
-                    "line_user_id": types.Schema(
-                        type=types.Type.STRING,
-                        description="LINE 用戶 ID",
-                    ),
                     "time_range": types.Schema(
                         type=types.Type.STRING,
                         description="時間範圍：all（全部）、last_month（近一個月）、last_3_months（近三個月）",
                         enum=["all", "last_month", "last_3_months"],
                     ),
                 },
-                required=["line_user_id"],
+                required=[],
             ),
         ),
         types.FunctionDeclaration(
