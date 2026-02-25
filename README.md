@@ -4,6 +4,8 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-kkdai%2Flinebot--gemini--multimodel--funcal-blue)](https://github.com/kkdai/linebot-gemini-multimodel-funcal)
 
+<img width="455" height="488" alt="Microsoft PowerPoint 2026-02-25 23 46 54" src="https://github.com/user-attachments/assets/12f8dc23-67e3-49a6-a7ac-e9469456b607" />
+
 ## 功能特色
 
 - **Multimodal Function Response**：函式回應中夾帶商品圖片，Gemini 能「看見」並描述圖片內容
