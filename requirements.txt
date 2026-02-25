@@ -4,4 +4,3 @@ uvicorn[standard]
 google-genai>=1.49.0
 aiohttp
 pydantic
-Pillow

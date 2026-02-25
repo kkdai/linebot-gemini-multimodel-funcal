@@ -15,7 +15,7 @@ def test_products_db_has_required_fields():
         assert "name" in product
         assert "color" in product
         assert "price" in product
-        assert "bg_color" in product  # RGB tuple for Pillow
+        assert "image_path" in product  # path to real product image
 
 
 def test_generate_product_image_returns_jpeg_bytes():
@@ -39,18 +39,18 @@ from multi_tool_agent.ecommerce_agent import (
 
 
 class TestSearchProducts:
-    def test_find_green_shirt_by_description(self):
-        result = search_products(description="綠色襯衫")
+    def test_find_bomber_jacket_by_description(self):
+        result = search_products(description="棕色飛行員外套")
         assert result["status"] == "success"
         assert result["count"] >= 1
         products = result["products"]
         assert any(p["product_id"] == "P001" for p in products)
 
     def test_find_by_color(self):
-        result = search_products(description="上衣", color="白色")
+        result = search_products(description="上衣", color="淺藍色")
         assert result["status"] == "success"
         products = result["products"]
-        assert any(p["product_id"] == "P002" for p in products)
+        assert any(p["product_id"] == "P005" for p in products)
 
     def test_returns_at_most_three_products(self):
         result = search_products(description="衣服")
@@ -88,8 +88,8 @@ class TestGetProductDetails:
     def test_returns_product_info(self):
         result = get_product_details(product_id="P001")
         assert result["status"] == "success"
-        assert result["product"]["name"] == "深綠色V領棉質襯衫"
-        assert result["product"]["price"] == 890
+        assert result["product"]["name"] == "棕色飛行員外套"
+        assert result["product"]["price"] == 1890
 
     def test_returns_error_for_unknown_product(self):
         result = get_product_details(product_id="P999")
@@ -156,13 +156,13 @@ async def test_agent_calls_tool_and_returns_image():
                 "get_order_history",
                 {"line_user_id": "user_test_b", "time_range": "all"},
             ),
-            make_text_response("您購買了深綠色V領棉質襯衫！"),
+            make_text_response("您購買了棕色飛行員外套！"),
         ])
 
         agent = EcommerceAgent(api_key="fake-key")
         text, image_bytes = await agent.process_message("我買過什麼", "user_test_b")
 
-        assert "深綠色V領棉質襯衫" in text
+        assert "棕色飛行員外套" in text
         assert image_bytes is not None  # P001 image generated
         assert isinstance(image_bytes, bytes)
         assert mock_client.aio.models.generate_content.call_count == 2

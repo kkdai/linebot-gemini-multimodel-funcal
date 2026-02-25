@@ -8,7 +8,7 @@
 
 - **Multimodal Function Response**：函式回應中夾帶商品圖片，Gemini 能「看見」並描述圖片內容
 - 智慧電商客服：訂單查詢、商品搜尋、商品規格查詢
-- 用 [Pillow](https://pillow.readthedocs.io/) 動態生成商品圖片（無需外部圖床）
+- 使用真實 Unsplash 服飾攝影照片，搭配 `img/` 目錄靜態圖片
 - FastAPI 非同步架構，支援 Cloud Run 部署
 - 完整的 pytest 測試套件
 
@@ -29,7 +29,7 @@ google.genai.Client.aio.models.generate_content()
     │  ② Gemini 決定呼叫工具
     ▼
 _execute_tool()  ──────────────────────────┐
-    │  返回結構化資料 + Pillow 生成的圖片 bytes  │
+    │  返回結構化資料 + 真實商品照片 bytes       │
     │                                       │
     ▼  ③ 建構多模態函式回應                    │
 FunctionResponsePart(                      │
@@ -55,20 +55,20 @@ LINE Bot reply:
 
 | 商品 ID | 名稱 | 顏色 | 價格 |
 |--------|------|------|------|
-| P001 | 深綠色V領棉質襯衫 | 深綠色 | NT$890 |
-| P002 | 白色寬鬆連帽T恤 | 白色 | NT$690 |
-| P003 | 深藍色直筒牛仔褲 | 深藍色 | NT$1,290 |
-| P004 | 粉紅色格紋洋裝 | 粉紅色 | NT$1,590 |
-| P005 | 黑色皮革短靴 | 黑色 | NT$2,490 |
+| P001 | 棕色飛行員外套 | 棕色 | NT$1,890 |
+| P002 | 白色棉質大學T | 白色 | NT$690 |
+| P003 | 深藍色牛仔外套 | 深藍色 | NT$1,490 |
+| P004 | 米白色針織披肩 | 米白色 | NT$1,290 |
+| P005 | 淺藍色簡約T恤 | 淺藍色 | NT$490 |
 
 **每位 LINE 用戶的預設訂單（第一次查詢時自動綁定）：**
 
 | 訂單編號 | 日期 | 商品 | 狀態 |
 |---------|------|------|------|
-| ORD-2026-0115 | 2026-01-15 | P001 深綠色V領棉質襯衫 | 已送達 |
-| ORD-2026-0108 | 2026-01-08 | P003 深藍色直筒牛仔褲 | 已送達 |
+| ORD-2026-0115 | 2026-01-15 | P001 棕色飛行員外套 | 已送達 |
+| ORD-2026-0108 | 2026-01-08 | P003 深藍色牛仔外套 | 已送達 |
 
-> **圖片說明**：商品圖片由 Pillow 動態生成（400×400 JPEG），以商品顏色為背景、白色商品名稱文字、黃色價格標籤。圖片在工具函式被呼叫時即時生成，無需預先上傳。
+> **圖片說明**：商品圖片為真實 Unsplash 服飾攝影照片，儲存於 `img/` 目錄。工具函式被呼叫時直接讀取圖片 bytes，夾帶進 Multimodal Function Response 讓 Gemini 分析。
 
 ---
 
@@ -80,31 +80,31 @@ LINE Bot reply:
 
 #### 🎬 場景 1：查詢訂單並識別商品（主要展示場景）
 
-**展示亮點**：Gemini 透過函式回應中的圖片，「認出」用戶描述的商品。
+**展示亮點**：Gemini 透過函式回應中的真實照片，「看見」並描述用戶曾購買的外套。
 
 **建議輸入句子：**
 ```
-幫我看看我上個月買的那件綠色襯衫
+幫我看看我之前買過的外套
 ```
 
 **Bot 內部執行流程：**
 
 ```
 步驟 1  用戶訊息送達
-        "幫我看看我上個月買的那件綠色襯衫"
+        "幫我看看我之前買過的外套"
             ↓
 步驟 2  Gemini 判斷需要查詢訂單，產生 function call：
-        get_order_history(line_user_id="Uxxxxxx", time_range="last_3_months")
+        get_order_history(time_range="all")
             ↓
 步驟 3  _execute_tool() 執行：
-        - get_order_history() 回傳訂單列表（含 P001 深綠色V領棉質襯衫）
-        - generate_product_image(P001) 用 Pillow 生成深綠色 400×400 JPEG
+        - get_order_history() 回傳兩筆訂單（P001、P003）
+        - 讀取 img/tobias-tullius-...-unsplash.jpg → P001 棕色飛行員外套照片 bytes
             ↓
 步驟 4  建構 Multimodal Function Response：
         FunctionResponsePart(
           inline_data=FunctionResponseBlob(
             mime_type="image/jpeg",
-            data=<深綠色商品圖片 bytes>  ← Gemini 在這裡看到圖片！
+            data=<棕色飛行員外套真實照片 bytes>  ← Gemini 在這裡看到圖片！
           )
         )
         Part.from_function_response(
@@ -113,44 +113,45 @@ LINE Bot reply:
           parts=[multimodal_part]         ← 圖片夾帶在函式回應中
         )
             ↓
-步驟 5  Gemini 收到「訂單資料 + 商品圖片」，生成回應：
-        "是這件深綠色V領棉質襯衫嗎？從圖片可以看到這是一件深綠色的
-        V領款式，棉質材質。您的訂單 ORD-2026-0115 已於 2026年1月15日
-        送達，數量 1 件，共 NT$890。"
+步驟 5  Gemini 收到「訂單資料 + 真實商品照片」，生成回應：
+        "從照片中可以看到這是一件棕色飛行員外套，輕量尼龍材質，
+        側邊有金屬拉鏈裝飾口袋，版型俐落。您的訂單 ORD-2026-0115
+        已於 2026年1月15日送達，共 NT$1,890。"
             ↓
 步驟 6  LINE Bot 回傳：
         [文字訊息] Gemini 的回答
-        [圖片訊息] 深綠色V領棉質襯衫圖片（由 /images/{uuid} 提供）
+        [圖片訊息] 棕色飛行員外套照片（由 /images/{uuid} 提供）
 ```
 
-**預期 LINE 畫面**：文字說明 + 深綠色商品圖片同時出現在對話框中。
+**預期 LINE 畫面**：文字說明 + 真實外套攝影照同時出現在對話框中。
 
 ---
 
 #### 🎬 場景 2：商品搜尋（搜尋 + 圖片辨識）
 
-**展示亮點**：Gemini 根據搜尋結果的圖片描述商品外觀。
+**展示亮點**：Gemini 根據搜尋結果的真實照片，描述商品的實際外觀與細節。
 
 **建議輸入句子：**
 ```
-有沒有粉紅色的洋裝？
+有沒有深藍色的外套？
 ```
 
 **Bot 內部執行流程：**
 
 ```
 步驟 1  Gemini 呼叫：
-        search_products(description="粉紅色洋裝", color="粉紅色")
+        search_products(description="深藍色外套", color="深藍色")
             ↓
-步驟 2  search_products() 配對到 P004 粉紅色格紋洋裝（得分最高）
-        generate_product_image(P004) 生成粉紅色背景圖片
+步驟 2  search_products() 配對到 P003 深藍色牛仔外套（得分最高）
+        讀取 img/caio-coelho-...-unsplash.jpg → 深藍色牛仔外套真實照片
             ↓
 步驟 3  Multimodal Function Response：
-        Gemini 收到搜尋結果 + 粉紅色格紋洋裝圖片
+        Gemini 收到搜尋結果 + 深藍色牛仔外套照片
             ↓
 步驟 4  Gemini 回應（結合圖片觀察）：
-        "有！圖片中是一件粉紅色格紋洋裝（P004），採 A 字裙擺設計，
-        浪漫格紋風格，售價 NT$1,590，目前庫存 5 件。"
+        "有！照片中這件深藍色牛仔外套（P003）可以看到復古風格的
+        縫線設計，翻領搭配金屬鈕扣，成衣感十足。售價 NT$1,490，
+        目前庫存 8 件。"
 ```
 
 ---
@@ -159,20 +160,21 @@ LINE Bot reply:
 
 **建議輸入句子：**
 ```
-P003 那件牛仔褲的詳細規格是什麼？
+P004 的針織披肩有什麼特色？
 ```
 
 **Bot 內部執行流程：**
 
 ```
 步驟 1  Gemini 呼叫：
-        get_product_details(product_id="P003")
+        get_product_details(product_id="P004")
             ↓
-步驟 2  回傳 P003 規格 + 深藍色牛仔褲圖片
+步驟 2  回傳 P004 規格 + 讀取 img/milada-vigerova-...-unsplash.jpg
             ↓
-步驟 3  Gemini 回應（對照圖片）：
-        "圖片中是一件深藍色直筒牛仔褲（P003），彈性牛仔布料，
-        直筒版型適合各種場合，售價 NT$1,290，目前庫存 8 件。"
+步驟 3  Gemini 回應（對照真實照片）：
+        "照片中是一件米白色手工鉤針編織披肩，V 領設計搭配底部流蘇，
+        整體質感輕盈優雅。掛在木衣架上可以看到蕾絲感網格編織。
+        售價 NT$1,290，庫存 5 件。"
 ```
 
 ---
@@ -186,7 +188,7 @@ P003 那件牛仔褲的詳細規格是什麼？
 幫我找找看有什麼白色的上衣
 ```
 ```
-黑色短靴還有庫存嗎？
+有適合秋天穿的外套嗎？
 ```
 ```
 我最近三個月的訂單有哪些？
@@ -201,7 +203,7 @@ P003 那件牛仔褲的詳細規格是什麼？
 ```python
 from google.genai import types
 
-# ① 用 Pillow 生成商品圖片（400×400 JPEG bytes）
+# ① 讀取真實商品照片（JPEG bytes）
 image_bytes = generate_product_image(PRODUCTS_DB["P001"])
 
 # ② 建構多模態部件：把圖片包進 FunctionResponsePart
@@ -241,7 +243,7 @@ response = await client.aio.models.generate_content(
 |--|--|--|
 | 函式回傳值 | 純文字/JSON | JSON + 圖片/PDF |
 | Gemini 能感知 | 文字資料 | 文字資料 **+ 視覺內容** |
-| 客服回應品質 | 「您的訂單是深綠色襯衫」 | 「圖片中是一件深綠色V領棉質款式，布料看起來...」 |
+| 客服回應品質 | 「您的訂單是棕色飛行員外套」 | 「照片中可以看到這件外套的尼龍材質光澤，側邊拉鏈口袋...」 |
 | 程式碼差異 | `Part.from_function_response(name, response)` | `Part.from_function_response(name, response, parts=[FunctionResponsePart(...)])` |
 
 ---
@@ -252,7 +254,7 @@ response = await client.aio.models.generate_content(
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [LINE Messaging API](https://developers.line.biz/en/services/messaging-api/)
 - [Google Gemini API](https://ai.google.dev/) via `google-genai 1.49.0`
-- [Pillow](https://pillow.readthedocs.io/) — 動態商品圖片生成
+- 商品照片：[Unsplash](https://unsplash.com/)（儲存於 `img/` 目錄）
 - Docker / Google Cloud Run（部署）
 
 ## Setup

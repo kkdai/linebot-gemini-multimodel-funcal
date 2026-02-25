@@ -1,60 +1,62 @@
 # multi_tool_agent/ecommerce_agent.py
 import copy
 import datetime
-from io import BytesIO
-from PIL import Image, ImageDraw
+from pathlib import Path
+
+# ── 商品圖片目錄 ──────────────────────────────────────────────────────────────
+_IMG_DIR = Path(__file__).parent.parent / "img"
 
 # ── Mock 商品資料庫 ──────────────────────────────────────────────────────────
 PRODUCTS_DB: dict[str, dict] = {
     "P001": {
         "id": "P001",
-        "name": "深綠色V領棉質襯衫",
-        "color": "深綠色",
-        "category": "上衣",
-        "price": 890,
+        "name": "棕色飛行員外套",
+        "color": "棕色",
+        "category": "外套",
+        "price": 1890,
         "stock": 15,
-        "description": "100% 純棉，透氣舒適，V 領設計，適合日常穿搭",
-        "bg_color": (34, 85, 34),
+        "description": "輕量尼龍材質，經典飛行員版型，側邊拉鏈口袋，適合春秋季節",
+        "image_path": str(_IMG_DIR / "tobias-tullius-Fg15LdqpWrs-unsplash.jpg"),
     },
     "P002": {
         "id": "P002",
-        "name": "白色寬鬆連帽T恤",
+        "name": "白色棉質大學T",
         "color": "白色",
         "category": "上衣",
         "price": 690,
         "stock": 20,
-        "description": "棉質混紡，寬鬆版型，帽子可拆卸",
-        "bg_color": (200, 200, 200),
+        "description": "100% 純棉，寬鬆舒適，簡約百搭，適合日常休閒",
+        "image_path": str(_IMG_DIR / "mediamodifier-7cERndkOyDw-unsplash.jpg"),
     },
     "P003": {
         "id": "P003",
-        "name": "深藍色直筒牛仔褲",
+        "name": "深藍色牛仔外套",
         "color": "深藍色",
-        "category": "下著",
-        "price": 1290,
+        "category": "外套",
+        "price": 1490,
         "stock": 8,
-        "description": "彈性牛仔布料，直筒版型，適合各種場合",
-        "bg_color": (26, 51, 102),
+        "description": "經典牛仔布料，復古縫線設計，鈕扣開襟，耐穿耐洗",
+        "image_path": str(_IMG_DIR / "caio-coelho-QRN47la37gw-unsplash.jpg"),
     },
     "P004": {
         "id": "P004",
-        "name": "粉紅色格紋洋裝",
-        "color": "粉紅色",
-        "category": "洋裝",
-        "price": 1590,
+        "name": "米白色針織披肩",
+        "color": "米白色",
+        "category": "上衣",
+        "price": 1290,
         "stock": 5,
-        "description": "浪漫格紋設計，A 字裙擺，優雅氣質",
-        "bg_color": (220, 150, 170),
+        "description": "手工鉤針編織，V 領流蘇設計，質感優雅，適合秋冬搭配",
+        "image_path": str(_IMG_DIR / "milada-vigerova-p8Drpg_duLw-unsplash.jpg"),
     },
     "P005": {
         "id": "P005",
-        "name": "黑色皮革短靴",
-        "color": "黑色",
-        "category": "鞋款",
-        "price": 2490,
-        "stock": 3,
-        "description": "真皮材質，低跟設計，防滑耐磨",
-        "bg_color": (30, 30, 30),
+        "name": "淺藍色簡約T恤",
+        "color": "淺藍色",
+        "category": "上衣",
+        "price": 490,
+        "stock": 30,
+        "description": "混紡棉質，柔軟透氣，圓領短袖，日常必備基本款",
+        "image_path": str(_IMG_DIR / "cristofer-maximilian-AqLIkOzWDAk-unsplash.jpg"),
     },
 }
 
@@ -65,7 +67,7 @@ _DEMO_ORDERS_TEMPLATE = [
         "date": "2026-01-15",
         "product_id": "P001",
         "quantity": 1,
-        "total": 890,
+        "total": 1890,
         "status": "已送達",
         "shipping_addr": "台北市信義區信義路五段7號",
     },
@@ -74,7 +76,7 @@ _DEMO_ORDERS_TEMPLATE = [
         "date": "2026-01-08",
         "product_id": "P003",
         "quantity": 1,
-        "total": 1290,
+        "total": 1490,
         "status": "已送達",
         "shipping_addr": "台北市信義區信義路五段7號",
     },
@@ -91,37 +93,12 @@ def get_user_orders(line_user_id: str) -> list[dict]:
     return _user_orders[line_user_id]
 
 
-# ── Pillow 圖片生成 ──────────────────────────────────────────────────────────
+# ── 商品圖片讀取 ──────────────────────────────────────────────────────────────
 
 def generate_product_image(product: dict) -> bytes:
-    """用 Pillow 生成 400×400 JPEG 商品圖片。"""
-    bg_color = product["bg_color"]
-    img = Image.new("RGB", (400, 400), color=bg_color)
-    draw = ImageDraw.Draw(img)
-
-    # 白色邊框
-    draw.rectangle([10, 10, 390, 390], outline=(255, 255, 255), width=3)
-
-    # 商品名稱（置中）
-    name = product["name"]
-    # 手動換行：每行最多 8 個字
-    lines = [name[i:i+8] for i in range(0, len(name), 8)]
-    y_start = 160 - (len(lines) - 1) * 20
-    for i, line in enumerate(lines):
-        bbox = draw.textbbox((0, 0), line)
-        w = bbox[2] - bbox[0]
-        draw.text(((400 - w) // 2 + 2, y_start + i * 40 + 2), line, fill=(0, 0, 0))
-        draw.text(((400 - w) // 2, y_start + i * 40), line, fill=(255, 255, 255))
-
-    # 價格標籤（底部）
-    price_text = f"NT$ {product['price']:,}"
-    bbox = draw.textbbox((0, 0), price_text)
-    pw = bbox[2] - bbox[0]
-    draw.text(((400 - pw) // 2, 320), price_text, fill=(255, 230, 0))
-
-    buf = BytesIO()
-    img.save(buf, format="JPEG", quality=85)
-    return buf.getvalue()
+    """讀取商品圖片並返回 JPEG bytes。"""
+    with open(product["image_path"], "rb") as f:
+        return f.read()
 
 
 # ── 工具函式 ─────────────────────────────────────────────────────────────────
@@ -140,7 +117,7 @@ def search_products(description: str, color: str | None = None) -> dict:
         if product["color"] in description:
             score += 2
         # 名稱關鍵字匹配
-        for keyword in ["襯衫", "T恤", "牛仔褲", "洋裝", "短靴", "上衣", "下著", "鞋"]:
+        for keyword in ["外套", "T恤", "大學T", "牛仔", "披肩", "上衣", "飛行員"]:
             if keyword in description and keyword in product["name"]:
                 score += 1
         # 類別匹配
